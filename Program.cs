@@ -3,13 +3,69 @@
 public static class MusicLibrary
 {
     public static List<Album> albums;
-    public static List<Album> favourites;
+    public static List<User> users;
+    public static int currentUserIndex;
 
     public static void Main(string[] args)
     {
+        // clear console and load data
         Console.Clear();
-        albums = LoadAlbumData("album-data");
-        favourites = LoadAlbumData("favourites-data");
+        albums = LoadJsonData<Album>("album-data");
+        users = LoadJsonData<User>("users-data");
+
+        // login loop
+        bool loggingIn = true;
+        while (loggingIn)
+        {
+            string menuSel = WriteLoginMenu();
+            Console.WriteLine();
+            switch (menuSel)
+            {
+                case "1": // login
+                {
+                    string username = ConsolePrompt("Enter username");
+                    string password = ConsolePrompt("Enter password");
+
+                    User matchingUser = users.Find(x => x.Username == username);
+                    if (matchingUser == null || matchingUser.Password != password)
+                    {
+                        Console.WriteLine("Invalid username / password");
+                    }
+                    else
+                    {
+                        currentUserIndex = users.FindIndex(x => x == matchingUser);
+                        Console.WriteLine("Logged in successfully");
+                        loggingIn = false;
+                    }
+
+                    break;
+                }
+                case "2": // sign up
+                {
+                    string username = ConsolePrompt("Enter username");
+                    string password = ConsolePrompt("Enter password");
+
+                    User matchingUser = users.Find(x => x.Username == username);
+                    if (matchingUser != null)
+                    {
+                        Console.WriteLine("User already exists");
+                    }
+                    else
+                    {
+                        users.Add(new User(username, password));
+                        Console.WriteLine("Signed up successfully! Please log in.");
+                    }
+
+                    break;
+                }
+                default:
+                {
+                    Console.WriteLine("Invalid input");
+                    break;
+                }
+            }
+            Console.WriteLine();
+        }
 
         Console.WriteLine("MUSIC LIBRARY");
 
@@ -23,112 +79,135 @@ public static class MusicLibrary
             switch (menuSel)
             {
                 case "1": // display all
-                    {
-                        Console.WriteLine("ALL ALBUMS");
-                        WriteAlbumsInList(albums);
-                        break;
-                    }
+                {
+                    Console.WriteLine("ALL ALBUMS");
+                    WriteAlbumsInList(albums);
+                    break;
+                }
                 case "2": // filter by property
-                    {
-                        string propertyName = GetPropertySelection();
-                        string filterString = ConsolePrompt("Enter value to filter for");
+                {
+                    string propertyName = GetPropertySelection();
+                    string filterString = ConsolePrompt("Enter value to filter for");
 
-                        List<Album> filteredAlbums = new List<Album>();
-                        // filter for genre
-                        if (propertyName == "Genres")
+                    List<Album> filteredAlbums = new List<Album>();
+                    // filter for genre
+                    if (propertyName == "Genres")
+                    {
+                        foreach (Album album in albums)
                         {
-                            foreach (Album album in albums)
+                            // find matching genre's index
+                            int matchingIndex = Array.FindIndex(
+                                album.Genres,
+                                x => x.ToLower() == filterString.ToLower()
+                            );
+                            if (matchingIndex == -1) // if no matching genre, continue
                             {
-                                // find matching genre's index
-                                int matchingIndex = Array.FindIndex(album.Genres, x => x.ToLower() == filterString.ToLower());
-                                if (matchingIndex == -1) // if no matching genre, continue
-                                {
-                                    continue;
-                                }
-                                else if (matchingIndex != 0) // if matching genre isnt first, make it first
-                                {
-                                    SwapValues<string>(album.Genres, 0, matchingIndex);
-                                }
-                                filteredAlbums.Add(album);
+                                continue;
                             }
+                            else if (matchingIndex != 0) // if matching genre isnt first, make it first
+                            {
+                                SwapValues<string>(album.Genres, 0, matchingIndex);
+                            }
+                            filteredAlbums.Add(album);
                         }
-                        else // filter for anything else
-                        {
-                            // adds all elements in album that match filterString to filteredAlbums
-                            filteredAlbums = albums.FindAll(x => typeof(Album).GetProperty(propertyName).GetValue(x).ToString().ToLower() == filterString.ToLower());
-                        }
-
-                        Console.WriteLine();
-                        Console.WriteLine($"Albums with {propertyName} matching {filterString}: ");
-                        WriteAlbumsInList(filteredAlbums, albums);
-                        break;
                     }
+                    else // filter for anything else
+                    {
+                        // adds all elements in album that match filterString to filteredAlbums
+                        filteredAlbums = albums.FindAll(
+                            x =>
+                                typeof(Album)
+                                    .GetProperty(propertyName)
+                                    .GetValue(x)
+                                    .ToString()
+                                    .ToLower() == filterString.ToLower()
+                        );
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine($"Albums with {propertyName} matching {filterString}: ");
+                    WriteAlbumsInList(filteredAlbums, albums);
+                    break;
+                }
                 case "3": // sort by property
-                    {
-                        string propertyName = GetPropertySelection();
+                {
+                    string propertyName = GetPropertySelection();
 
-                        // time sort
-                        decimal startTime = GetCurrentTime();
-                        albums = SortBy(albums, propertyName);
-                        decimal endTime = GetCurrentTime();
-                        Console.WriteLine($"Sorted by {propertyName} ({endTime - startTime} seconds)");
-                        break;
-                    }
+                    // time sort
+                    decimal startTime = GetCurrentTime();
+                    albums = SortBy(albums, propertyName);
+                    decimal endTime = GetCurrentTime();
+                    Console.WriteLine($"Sorted by {propertyName} ({endTime - startTime} seconds)");
+                    break;
+                }
                 case "4": // add to favourites
+                {
+                    string favouriteIndexStr = ConsolePrompt(
+                        "Enter index of album to add to favourites"
+                    );
+                    if (
+                        Int32.TryParse(favouriteIndexStr, out int favouriteIndex)
+                        && favouriteIndex < albums.Count
+                    )
                     {
-                        string favouriteIndexStr = ConsolePrompt("Enter index of album to add to favourites");
-                        if (Int32.TryParse(favouriteIndexStr, out int favouriteIndex) && favouriteIndex < albums.Count)
-                        {
-                            favourites.Add(albums[favouriteIndex]);
-                        }
-                        else
-                        {
-                            Console.WriteLine("Invalid Input");
-                        }
-                        break;
+                        users[currentUserIndex].Favourites.Add(albums[favouriteIndex]);
                     }
+                    else
+                    {
+                        Console.WriteLine("Invalid Input");
+                    }
+                    break;
+                }
                 case "5": // remove from favourites
+                {
+                    string favouriteIndexStr = ConsolePrompt(
+                        "Enter index of album to remove from favourites"
+                    );
+                    if (
+                        Int32.TryParse(favouriteIndexStr, out int favouriteIndex)
+                        && favouriteIndex < users[currentUserIndex].Favourites.Count
+                    )
                     {
-                        string favouriteIndexStr = ConsolePrompt("Enter index of album to remove from favourites");
-                        if (Int32.TryParse(favouriteIndexStr, out int favouriteIndex) && favouriteIndex < favourites.Count)
-                        {
-                            favourites.RemoveAt(favouriteIndex);
-                        }
-                        else
-                        {
-                            Console.WriteLine("Invalid Input");
-                        }
-                        break;
+                        users[currentUserIndex].Favourites.RemoveAt(favouriteIndex);
                     }
+                    else
+                    {
+                        Console.WriteLine("Invalid Input");
+                    }
+                    break;
+                }
                 case "6": // display favourites
-                    {
-                        Console.WriteLine("FAVOURITE ALBUMS");
-                        WriteAlbumsInList(favourites);
-                        break;
-                    }
+                {
+                    Console.WriteLine("FAVOURITE ALBUMS");
+                    WriteAlbumsInList(users[currentUserIndex].Favourites);
+                    break;
+                }
                 case "7": // configure settings
-                    {
-                        string showGenre = ConsolePrompt("Would you like to show album's genres? (Y/N)").ToLower();
-                        string showYear = ConsolePrompt("Would you like to show album's year? (Y/N)").ToLower();
-                        Settings.showGenre = (showGenre == "y");
-                        Settings.showYear = (showYear == "y");
-                        break;
-                    }
+                {
+                    string showGenre = ConsolePrompt("Would you like to show album's genres? (Y/N)")
+                        .ToLower();
+                    string showYear = ConsolePrompt("Would you like to show album's year? (Y/N)")
+                        .ToLower();
+                    Settings.showGenre = (showGenre == "y");
+                    Settings.showYear = (showYear == "y");
+                    break;
+                }
                 case "8": // exit
-                    {
-                        isRunning = false;
-                        break;
-                    }
+                {
+                    isRunning = false;
+                    break;
+                }
                 default:
-                    {
-                        Console.WriteLine("Invalid input");
-                        break;
-                    }
+                {
+                    Console.WriteLine("Invalid input");
+                    break;
+                }
             }
         }
-        SaveAlbumData(albums, "album-data");
-        SaveAlbumData(favourites, "favourites-data");
+        SaveJsonData(albums, "album-data");
+        SaveJsonData(users, "users-data");
     }
+
     // write selection menu and return selection
     static string WriteMenu()
     {
@@ -145,15 +224,24 @@ public static class MusicLibrary
         return ConsolePrompt("Enter a selection (1-8)");
     }
 
+    // write login menu and return selection
+    static string WriteLoginMenu()
+    {
+        Console.WriteLine("LOGIN / SIGNUP");
+        Console.WriteLine("1: Login");
+        Console.WriteLine("2: Sign Up");
+        return ConsolePrompt("Enter a selection (1-2)");
+    }
+
     // load album data from fileName.json, return list
-    static List<Album> LoadAlbumData(string fileName)
+    static List<T> LoadJsonData<T>(string fileName)
     {
         string jsonString = File.ReadAllText($"{fileName}.json");
-        return JsonSerializer.Deserialize<List<Album>>(jsonString);
+        return JsonSerializer.Deserialize<List<T>>(jsonString);
     }
 
     // save album data from list to fileName.json
-    static void SaveAlbumData(List<Album> list, string fileName)
+    static void SaveJsonData<T>(List<T> list, string fileName)
     {
         string jsonString = JsonSerializer.Serialize(list);
         File.WriteAllText($"{fileName}.json", jsonString);
@@ -179,7 +267,9 @@ public static class MusicLibrary
         }
         else
         {
-            return toSort.OrderBy(album => typeof(Album).GetProperty(propertyName).GetValue(album)).ToList();
+            return toSort
+                .OrderBy(album => typeof(Album).GetProperty(propertyName).GetValue(album))
+                .ToList();
         }
     }
 
@@ -218,6 +308,7 @@ public static class MusicLibrary
         return timeInSeconds;
     }
 
+    // swap values in array
     static void SwapValues<T>(this T[] source, long index1, long index2)
     {
         T temp = source[index1];
@@ -272,6 +363,25 @@ public class Album
         }
 
         return albumString;
+    }
+}
+
+public class User
+{
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public List<Album> Favourites { get; set; }
+
+    public User(string username, string password)
+    {
+        this.Username = username;
+        this.Password = password;
+        this.Favourites = new List<Album>();
+    }
+
+    public override string ToString()
+    {
+        return $"{Username} - {Password}";
     }
 }
 
